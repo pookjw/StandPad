@@ -1,5 +1,6 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import <dlfcn.h>
 #import <execinfo.h>
 #import <cstring>
@@ -25,7 +26,9 @@ BOOL isCalledFromMethod(Class cls, SEL name) {
 namespace SP_os_feature_enabled_impl {
     BOOL (*original)(const char *arg0, const char *arg1);
     BOOL custom(const char *arg0, const char *arg1) {
-        if (!std::strcmp(arg0, "SpringBoard") && !std::strcmp(arg1, "Domino")) {
+        if (!std::strcmp(arg0, "SpringBoard") && !std::strcmp(arg1, "SuperDomino")) {
+            return YES;
+        } else if (!std::strcmp(arg0, "SpringBoard") && !std::strcmp(arg1, "Domino")) {
             return YES;
         } else {
             return original(arg0, arg1);
@@ -73,8 +76,35 @@ namespace SP_UIDevice {
             MSHookMessageEx(
                 UIDevice.class,
                 @selector(userInterfaceIdiom),
-                reinterpret_cast<IMP>(&SP_UIDevice::userInterfaceIdiom::custom),
-                reinterpret_cast<IMP *>(&SP_UIDevice::userInterfaceIdiom::original)
+                reinterpret_cast<IMP>(&custom),
+                reinterpret_cast<IMP *>(&original)
+            );
+        }
+    }
+}
+
+namespace SP_SBHomeHardwareButton {
+    namespace doublePressDown {
+        void custom(id self, SEL _cmd, UIPressesEvent *event) {
+            [UIApplication.sharedApplication.connectedScenes enumerateObjectsUsingBlock:^(UIScene * _Nonnull obj, BOOL * _Nonnull stop) {
+                if ([obj isKindOfClass:NSClassFromString(@"SBWindowScene")]) {
+                    auto windowScene = reinterpret_cast<__kindof UIWindowScene *>(obj);
+
+                    // SBAmbientPresentationController
+                    id controller = reinterpret_cast<id (*)(id, SEL)>(objc_msgSend)(windowScene, NSSelectorFromString(@"ambientPresentationController"));
+
+                    auto isPresented = reinterpret_cast<BOOL (*)(id, SEL)>(objc_msgSend)(controller, NSSelectorFromString(@"isPresented"));
+                    reinterpret_cast<void (*)(id, SEL, BOOL)>(objc_msgSend)(controller, NSSelectorFromString(@"_setPresented:"), !isPresented);
+                }
+            }];
+        }
+
+        void hook() {
+            MSHookMessageEx(
+                NSClassFromString(@"SBHomeHardwareButton"),
+                NSSelectorFromString(@"doublePressDown:"),
+                reinterpret_cast<IMP>(&custom),
+                nullptr
             );
         }
     }
@@ -86,6 +116,7 @@ __attribute__((constructor)) static void init() {
     SP_os_feature_enabled_impl::hook();
     SP_SBFEffectiveDeviceClass::hook();
     SP_UIDevice::userInterfaceIdiom::hook();
+    SP_SBHomeHardwareButton::doublePressDown::hook();
 
     [pool release];
 }
