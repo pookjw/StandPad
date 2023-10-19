@@ -30,6 +30,10 @@ namespace SP_os_feature_enabled_impl {
             return YES;
         } else if (!std::strcmp(arg0, "SpringBoard") && !std::strcmp(arg1, "Domino")) {
             return YES;
+        } else if (!std::strcmp(arg0, "SpringBoard") && !std::strcmp(arg1, "Autobahn")) {
+            return YES;
+        } else if (!std::strcmp(arg0, "SpringBoard") && !std::strcmp(arg1, "Maglev")) {
+            return YES;
         } else {
             return original(arg0, arg1);
         }
@@ -110,6 +114,23 @@ namespace SP_SBHomeHardwareButton {
     }
 }
 
+namespace SP_SBAmbientPresentationController {
+    namespace isAlwaysOnPolicyActive {
+        BOOL custom(id self, SEL _cmd) {
+            return YES;
+        }
+
+        void hook() {
+            MSHookMessageEx(
+                NSClassFromString(@"SP_SBAmbientPresentationController"),
+                NSSelectorFromString(@"isAlwaysOnPolicyActive"),
+                reinterpret_cast<IMP>(&custom),
+                nullptr
+            );
+        }
+    }
+}
+
 __attribute__((constructor)) static void init() {
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
 
@@ -117,6 +138,7 @@ __attribute__((constructor)) static void init() {
     SP_SBFEffectiveDeviceClass::hook();
     SP_UIDevice::userInterfaceIdiom::hook();
     SP_SBHomeHardwareButton::doublePressDown::hook();
+    SP_SBAmbientPresentationController::isAlwaysOnPolicyActive::hook();
 
     [pool release];
 }
